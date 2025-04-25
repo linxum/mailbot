@@ -1,0 +1,3 @@
+imapclient
+pyTelegramBotAPI
+psycopg2-binary
