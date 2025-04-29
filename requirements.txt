@@ -1,3 +1,4 @@
 imapclient
 pyTelegramBotAPI
 psycopg2-binary
+html2text
