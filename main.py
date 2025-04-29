@@ -69,6 +69,22 @@ def extract_plain_text(msg):
         return msg.get_payload(decode=True).decode(charset, errors='replace')
     return ""
 
+def save_and_send_attachments(msg, chat_id):
+    """Сохраняет вложения и отправляет их в чат Telegram."""
+    for part in msg.walk():
+        if part.get_content_disposition() and part.get_filename():
+            filename = part.get_filename()
+            file_data = part.get_payload(decode=True)
+
+            if filename:
+                # Сохраняем файл локально
+                with open(filename, 'wb') as f:
+                    f.write(file_data)
+                
+                # Отправляем файл в Telegram
+                with open(filename, 'rb') as f:
+                    bot.send_document(chat_id, f)
+
 def process_mail(server):
     server.select_folder('INBOX', readonly=True)
     messages = server.search(['UNSEEN'])
@@ -103,10 +119,15 @@ def process_mail(server):
 
         try:
             bot.send_message(CHAT_ID, text, parse_mode='HTML')
+            
+            # Отправка вложений
+            save_and_send_attachments(msg, CHAT_ID)
+            
             mark_uid_processed(uid)
             print(f"✅ UID {uid} обработан и сохранён в БД.")
         except Exception as e:
             print("⚠️ Ошибка отправки:", e)
+
 
 # --- Основной цикл ---
 def mail_monitor():
