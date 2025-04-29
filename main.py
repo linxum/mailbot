@@ -6,6 +6,7 @@ from email.header import decode_header
 import telebot
 import html
 import psycopg2
+import html2text
 
 # --- Настройки ---
 EMAIL = 'email'
@@ -58,15 +59,32 @@ def extract_email_address(full_from_header):
 def extract_plain_text(msg):
     if msg.is_multipart():
         for part in msg.walk():
-            if part.get_content_type() == "text/plain" and "attachment" not in str(part.get("Content-Disposition", "")):
+            if part.is_multipart():
+                for subpart in part.walk():
+                    if subpart.get_content_type() in ["text/plain", "text/html"] and "attachment" not in str(subpart.get("Content-Disposition", "")):
+                        charset = subpart.get_content_charset() or 'utf-8'
+                        try:
+                            content = subpart.get_payload(decode=True).decode(charset, errors='replace')
+                            if subpart.get_content_type() == "text/html":
+                                return html2text.html2text(content)  # Преобразование HTML в текст
+                            return content
+                        except:
+                            continue
+            if part.get_content_type() in ["text/plain", "text/html"] and "attachment" not in str(part.get("Content-Disposition", "")):
                 charset = part.get_content_charset() or 'utf-8'
                 try:
-                    return part.get_payload(decode=True).decode(charset, errors='replace')
+                    content = part.get_payload(decode=True).decode(charset, errors='replace')
+                    if part.get_content_type() == "text/html":
+                        return html2text.html2text(content)  # Преобразование HTML в текст
+                    return content
                 except:
                     continue
     else:
         charset = msg.get_content_charset() or 'utf-8'
-        return msg.get_payload(decode=True).decode(charset, errors='replace')
+        content = msg.get_payload(decode=True).decode(charset, errors='replace')
+        if msg.get_content_type() == "text/html":
+            return html2text.html2text(content)  # Преобразование HTML в текст
+        return content
     return ""
 
 def save_and_send_attachments(msg, chat_id):
@@ -118,6 +136,7 @@ def process_mail(server):
         )
 
         try:
+            # Отправляем текст сообщения
             bot.send_message(CHAT_ID, text, parse_mode='HTML')
             
             # Отправка вложений
@@ -127,7 +146,6 @@ def process_mail(server):
             print(f"✅ UID {uid} обработан и сохранён в БД.")
         except Exception as e:
             print("⚠️ Ошибка отправки:", e)
-
 
 # --- Основной цикл ---
 def mail_monitor():
